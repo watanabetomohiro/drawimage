@@ -51,25 +51,21 @@ def makepath(path):
 # データ入力 (まとめて読込)
 data_files = glob.glob(ndpath+'*ndvi.tif')
 data_files.sort()
-print(data_files)
+#print(data_files)
 len_num = len(data_files)
 col = int(4)
 #print('len:',len_num)
 raw =math.ceil(len_num/col)
-my_dpi = 100
-im_col =  148 * (col*2)
-im_raw = 384 *(col*4)
+my_dpi = 50
+im_col =  148 * (col*4)
+im_raw = 384 *(col*1)
 resize = 1
-#width = 100
-#height = 50
 
 dwscale_factor = 1/2
 print(int(im_raw/my_dpi),int(im_col/my_dpi))
 
 #fig = plt.figure(figsize=(11.69, 8.27))
 #fig = plt.figure(figsize=(width, height))
-#fig = plt.figure(figsize=(im_raw/my_dpi, im_col/my_dpi), dpi = my_dpi)
-#fig = plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
 plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
 plt.clf()
 #plt.figure(figsize=(im_raw, im_col), dpi = my_dpi)
@@ -77,6 +73,7 @@ plt.clf()
 #-----------画像の切り出し
 for i in range(len_num):
   with rasterio.open(data_files[i]) as src:
+    print("num,filename",i+1,data_files[i])  
     # resample data to target shape
     data = src.read(
         out_shape=(
@@ -94,14 +91,14 @@ for i in range(len_num):
         (src.width / data.shape[-1]),
         (src.height / data.shape[-2])
     )
-    print(data.shape)
+#    print(data.shape)
     
 #  j+=1# 画像のプロット位置をシフトさせ配置
   plt.subplot(raw, col, i+1)
   plt.imshow(data[0], clim=(-1, 1), cmap=cm.jet, interpolation='nearest')
 #  plt.imshow(img_resize, clim=(-1, 1), cmap=cm.jet, interpolation='nearest')
   plt.colorbar()
-  plt.title(data_files[i][-17:-4], fontsize=25)# ファイル名から日付を取得
+  plt.title(data_files[i][-17:-4], fontsize=15)# ファイル名から日付を取得
   plt.tight_layout()
 
 #save
