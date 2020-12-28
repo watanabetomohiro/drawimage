@@ -491,8 +491,8 @@ plt.plot(gsi1, marker='1', label='GSI')
 plt.legend()
 ax2.set_xticks(np.arange(0,sum))  #X軸の数
 ax2.set_xticklabels(date1, fontsize=10,rotation = 25, ha="center")
-ax2.set_ylim(-1, 1)
-plt.tight_layout()
+ax2.set_ylim(-1, 1) #y軸の最小と最大を決める
+plt.tight_layout() #レイアウトを最適化　ラベルが消えるのを制御する。
 #plt.show()
 indexFile = outpath+filename+"_time_series_index_img.jpg"
 if os.path.isfile(indexFile):
