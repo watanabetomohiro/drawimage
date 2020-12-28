@@ -69,7 +69,7 @@ print(int(im_raw/my_dpi),int(im_col/my_dpi))
 #fig = plt.figure(figsize=(11.69, 8.27))
 #fig = plt.figure(figsize=(width, height))
 #fig = plt.figure(figsize=(im_raw/my_dpi, im_col/my_dpi), dpi = my_dpi)
-fig = plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
+#fig = plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
 plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
 plt.clf()
 #plt.figure(figsize=(im_raw, im_col), dpi = my_dpi)
@@ -106,7 +106,7 @@ for i in range(len_num):
 
 #save
 plt.ioff()
-strFile = outpath+filename+"_time_series_img.jpg"
+strFile = outpath+filename+"_time_series_img1.jpg"
 if os.path.isfile(strFile):
     os.remove(strFile)   # Opt.: os.system("rm "+strFile)
 plt.savefig(strFile, dpi=my_dpi)
