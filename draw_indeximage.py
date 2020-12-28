@@ -63,16 +63,17 @@ resize = 1
 #width = 100
 #height = 50
 
-dwscale_factor = 1/5
+dwscale_factor = 1/2
 print(int(im_raw/my_dpi),int(im_col/my_dpi))
 
 #fig = plt.figure(figsize=(11.69, 8.27))
 #fig = plt.figure(figsize=(width, height))
 #fig = plt.figure(figsize=(im_raw/my_dpi, im_col/my_dpi), dpi = my_dpi)
 fig = plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
-#plt.clf()
+plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
+plt.clf()
 #plt.figure(figsize=(im_raw, im_col), dpi = my_dpi)
-fig.clf()
+#fig.clf()
 #-----------画像の切り出し
 for i in range(len_num):
   with rasterio.open(data_files[i]) as src:
@@ -104,21 +105,16 @@ for i in range(len_num):
   plt.tight_layout()
 
 #save
-strFile = outpath+filename+"_time_series_img4.tif"
-#if os.path.isfile(strFile):
-#    os.remove(strFile)   # Opt.: os.system("rm "+strFile)
-fig.savefig(strFile, dpi=my_dpi)
-    
-#fig.savefig(outpath+filename+"_time_series_img.pdf", dpi=my_dpi)
-#fig.savefig(outpath+filename+"_time_series_img2.jpg", dpi=my_dpi)
-#plt.savefig(outpath+filename+"_time_series_img.jpg")
+plt.ioff()
+strFile = outpath+filename+"_time_series_img.jpg"
+if os.path.isfile(strFile):
+    os.remove(strFile)   # Opt.: os.system("rm "+strFile)
+plt.savefig(strFile, dpi=my_dpi)
 
 print(src.closed)
-plt.show()
-#plt.savefig(outpath+filename+"_time_series_img.pdf")
+#plt.show()
 plt.cla() 
-fig.clf()
 plt.close('all')   
-plt.close(fig)
+plt.close()   
 gc.collect()
 
