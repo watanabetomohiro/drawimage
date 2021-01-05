@@ -38,8 +38,8 @@ outpath = output+'RESULT/'
 direct = input+'MET/'
 # inputデータ
 in_file = area_name+"_data.csv"   # 元の気象データ
-input_shp = shpath + filename+'.shp'
-data_path = input+'/DATA/'
+input_shp = shpath + filename+'.shp' #　切り出し用のshpファイル
+data_path = input+'/DATA/' # オリジナルのセンチネルデータ
 # outputデータ
 strFile = outpath+filename+"_time_series_img_all.jpg"
 merge_file = outpath+filename+"_merge.csv"
@@ -308,6 +308,7 @@ df_clip2.to_csv(merge_file, encoding="Shift_JIS", date_format='%Y%m%d')
 #'pearson': ピアソンの積率相関係数（デフォルト）
 #'kendall': ケンドールの順位相関係数
 #'spearman': スピアマンの順位相関係数
+# 表の並べ替え　https://qiita.com/Masahiro_T/items/2f9574c80193f58af7fe
 df_clip2_corr = df_clip2.corr(method='pearson')
 print(df_clip2.corr())
 if os.path.isfile(corr_file):
