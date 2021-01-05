@@ -11,7 +11,6 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib as mpl
-#mpl.use('TkAgg')
 import matplotlib.pyplot as plt
 import rasterio
 from rasterio import plot
@@ -30,7 +29,6 @@ direct_name = '/home/twatanabe/senti/'
 filename = "kohoku_AOI1_clip_paddy" #  長浜
 input =  direct_name+area_name+'/INPUT/'
 output = direct_name+area_name+'/OUTPUT/'
-data_path = input+'/DATA/'
 ndpath = output+'IMAGE/NDVI/'
 nwpath = output+'IMAGE/NDWI/'
 nspath = output+'IMAGE/NDSI/'
@@ -38,9 +36,17 @@ gspath = output+'IMAGE/GSI/'
 shpath = input+'SHP/'
 outpath = output+'RESULT/'
 direct = input+'MET/'
+# inputデータ
 in_file = area_name+"_data.csv"   # 元の気象データ
-merge_file = outpath+filename+"_merge.csv"
 input_shp = shpath + filename+'.shp'
+data_path = input+'/DATA/'
+# outputデータ
+strFile = outpath+filename+"_time_series_img_all.jpg"
+merge_file = outpath+filename+"_merge.csv"
+corr_file = outpath+filename+"_corr.csv"
+desc_file = outpath+filename+"_desc.csv"
+precFile = outpath+filename+"_time_series_prec_img.jpg"
+indexFile = outpath+filename+"_time_series_index_img.jpg"
 
 #----------------------------フォルダが存在しない場合に作成する。
 def makepath(path):
@@ -48,7 +54,6 @@ def makepath(path):
     os.makedirs(path)  
 #----------------------------NDVI
 # Define a function to calculate NDVI using band arrays for red, NIR bands
-#def ndvi(red, nir):
 def calNDVI(r_band,nir_band):
   nir = nir_band.astype(np.float32)
   red = r_band.astype(np.float32)
@@ -96,21 +101,6 @@ def outputGeotifSingle(src,epgs,band1,path):
     output.GetRasterBand(1).WriteArray(band1)
     output.FlushCache()
     output=None
-#---------------------------線形補完
-def ch_hist(image):
- # ヒストグラムの取得
- ndvi = np.nan_to_num(image,nan = 0)  #nanを0に置換
- #ndvi = image[~np.isnan(image)]
- hist, bins = np.histogram( ndvi.flatten(), bins=256)
- # 累積分布を取る
- cdf = hist.cumsum()
- # 正規化（0〜255の分布にする）
- cdf = 255 * cdf / cdf[-1]
- # 線形補間
- img2 = np.interp( ndvi.flatten(), bins[:-1], cdf)
- # 出来上がった配列のhistogramを見てみる
- hist2, bins2 = np.histogram( img2, bins=255 )
- return (img2)
 #-----------------------タイトル、平均リスト合計
 def dataInfo(data_mean_list, data):
   data_mean = np.nanmean(data)
@@ -140,15 +130,7 @@ ndsi_mean_list = np.zeros(0)
 gsi_mean_list = np.zeros(0)
 data_title_list = np.zeros(0)
 
-#print(data_files_org)
-#dfs = pd.DataFrame(data_files)
-#size = dfs.size
-#print('file_number:',size)
-#sum = size * 3
-#image_len = size * 7
-#print(sum)
-
-#print(data_files)
+# ----------------------画像範囲設定
 len_num = len(data_files)
 col = int(4)
 raw =math.ceil(len_num)
@@ -158,25 +140,17 @@ im_col =  148 * (col*2*9)
 im_raw = 384 *(col*1)
 
 
-# ----------------------画像範囲設定
 #fig = plt.figure(figsize=(18, image_len))
 #fig = plt.figure(figsize=(25, 200))
 plt.figure(figsize=(int(im_raw/my_dpi),int(im_col/my_dpi)), dpi = my_dpi)
-plt.clf()
-
-#ax=[]
-#fig = plt.figure(figsize=(11.6,8.27), dpi=100)
-#fig = plt.figure()
 plt.clf()
 print(mpl.matplotlib_fname())
 
 j=0
 num=1
-#for i in range(size-1):
 
 #-----------画像の切り出し
-#for i in range(size):
-for i in range(20):
+for i in range(30):
 #for i in range(len_num):
   input_raster = data_files[i]
   output_raster = data_files[i][:-4]+'_clip.tif'
@@ -215,7 +189,6 @@ for i in range(20):
   ndsi_mean_list, ndsi_mean = dataInfo(ndsi_mean_list, ndsi)
   gsi_mean_list, gsi_mean = dataInfo(gsi_mean_list, gsi)
 
-
 #---get image date------
 #  data_title = data_files[i][-31:-23]
   data_title = input_raster[-26:-18]
@@ -250,11 +223,9 @@ for i in range(20):
   plt.xlabel(data_title+'_gsi', fontsize=30)
   plt.tight_layout()
 
-
 ##----画像の保存
 #plt.show()
 plt.ioff()
-strFile = outpath+filename+"_time_series_img_all.jpg"
 if os.path.isfile(strFile):
         os.remove(strFile)   # Opt.: os.system("rm "+strFile)
 plt.savefig(strFile, dpi=my_dpi)
@@ -313,10 +284,6 @@ vi_data[name_NDWI] =  pd.Series(vi_data[name_NDWI], dtype='float') #floatに変�
 vi_data[name_NDSI] =  pd.Series(vi_data[name_NDSI], dtype='float') #floatに変換
 vi_data[name_GSI] =  pd.Series(vi_data[name_GSI], dtype='float') #floatに変換
 
-#print("df:",df)
-#print("vi_data:",vi_data)
-#print(df.dtypes)
-#print(vi_data.dtypes)
 
 #　同じ日付を抽出　https://reffect.co.jp/python/python-pandas-not-duplicate-in-two-excels
 df_merge = pd.merge(vi_data,df,on="年月日",how="outer",indicator=True)
@@ -324,9 +291,28 @@ df_clip = df_merge[df_merge["_merge"] == 'both']
 df_clip2 = df_clip.dropna() #NaN（欠損値）が一つでもある行は削除する。（https://note.nkmk.me/python-pandas-nan-dropna-fillna/）
 #print("df_clip2:",df_clip2)
 
+#'統計量を算出する
+df_clip2_desc = df_clip2.describe()
+print(df_clip2.describe())
+if os.path.isfile(desc_file):
+        os.remove(desc_file)   # Opt.: os.system("rm "+strFile)
+df_clip2_desc.to_csv(desc_file, encoding="Shift_JIS",  date_format='%Y%m%d')
 
 # mergeしたデータをcsvで保存する。
-df_clip2.to_csv(merge_file, encoding="Shift_JIS", index=False, date_format='%Y%m%d')
+if os.path.isfile(merge_file):
+        os.remove(merge_file)   # Opt.: os.system("rm "+strFile)
+#df_clip2.to_csv(merge_file, encoding="Shift_JIS", index=False, date_format='%Y%m%d')
+df_clip2.to_csv(merge_file, encoding="Shift_JIS", date_format='%Y%m%d')
+
+## 相関係数をまとめて計算
+#'pearson': ピアソンの積率相関係数（デフォルト）
+#'kendall': ケンドールの順位相関係数
+#'spearman': スピアマンの順位相関係数
+df_clip2_corr = df_clip2.corr(method='pearson')
+print(df_clip2.corr())
+if os.path.isfile(corr_file):
+        os.remove(corr_file)   # Opt.: os.system("rm "+strFile)
+df_clip2_corr.to_csv(corr_file, encoding="Shift_JIS",  date_format='%Y%m%d')
 
 
 date1 =  np.array(df_clip2["年月日"])
@@ -342,123 +328,11 @@ prec6 = np.array(df_clip2["日降水量_6日積算"])
 prec7 = np.array(df_clip2["日降水量_7日積算"])
 prec30 = np.array(df_clip2["日降水量_30日積算"])
 
-#print('prep:',prep)
-
-##相関係数を求める
-# リストをps.Seriesに変換
-s1=pd.Series(prec)
-s13=pd.Series(prec3)
-s14=pd.Series(prec4)
-s15=pd.Series(prec5)
-s16=pd.Series(prec6)
-s17=pd.Series(prec7)
-s130=pd.Series(prec30)
-
-s2=pd.Series(ndvi1)
-s3=pd.Series(ndwi1)
-s4=pd.Series(ndsi1)
-s5=pd.Series(gsi1)
-
-nd_corr = s1.corr(s2) # numpy.float64 に格納される 降水量-NDVI
-nw_corr = s1.corr(s3) # numpy.float64 に格納される 降水量-NWVI
-ns_corr = s1.corr(s4) # numpy.float64 に格納される 降水量-NDSI
-gs_corr = s1.corr(s5) # numpy.float64 に格納される 降水量-GSI
-
-nd_corr3 = s13.corr(s2) # numpy.float64 に格納される 降水量3-NDVI
-nw_corr3 = s13.corr(s3) # numpy.float64 に格納される 降水量3-NWVI
-ns_corr3 = s13.corr(s4) # numpy.float64 に格納される 降水量3-NDSI
-gs_corr3 = s13.corr(s5) # numpy.float64 に格納される 降水量3-GSI
-
-nd_corr4 = s14.corr(s2) # numpy.float64 に格納される 降水量4-NDVI
-nw_corr4 = s14.corr(s3) # numpy.float64 に格納される 降水量4-NWVI
-ns_corr4 = s14.corr(s4) # numpy.float64 に格納される 降水量4-NDSI
-gs_corr4 = s14.corr(s5) # numpy.float64 に格納される 降水量4-GSI
-
-nd_corr5 = s15.corr(s2) # numpy.float64 に格納される 降水量5-NDVI
-nw_corr5 = s15.corr(s3) # numpy.float64 に格納される 降水量5-NWVI
-ns_corr5 = s15.corr(s4) # numpy.float64 に格納される 降水量5-NDSI
-gs_corr5 = s15.corr(s5) # numpy.float64 に格納される 降水量5-GSI
-
-nd_corr6 = s16.corr(s2) # numpy.float64 に格納される 降水量6-NDVI
-nw_corr6 = s16.corr(s3) # numpy.float64 に格納される 降水量6-NWVI
-ns_corr6 = s16.corr(s4) # numpy.float64 に格納される 降水量6-NDSI
-gs_corr6 = s16.corr(s5) # numpy.float64 に格納される 降水量6-GSI
-
-nd_corr7 = s17.corr(s2) # numpy.float64 に格納される 降水量7-NDVI
-nw_corr7 = s17.corr(s3) # numpy.float64 に格納される 降水量7-NWVI
-ns_corr7 = s17.corr(s4) # numpy.float64 に格納される 降水量7-NDSI
-gs_corr7 = s17.corr(s5) # numpy.float64 に格納される 降水量7-GSI
-
-nd_corr30 = s130.corr(s2) # numpy.float64 に格納される 降水量30-NDVI
-nw_corr30 = s130.corr(s3) # numpy.float64 に格納される 降水量30-NWVI
-ns_corr30 = s130.corr(s4) # numpy.float64 に格納される 降水量30-NDSI
-gs_corr30 = s130.corr(s5) # numpy.float64 に格納される 降水量30-GSI
-
-# 結果
-print('相関係数(降水量-NDVI)：','{:.3f}'.format(nd_corr))
-print('相関係数(降水量-NWVI)：','{:.3f}'.format(nw_corr))
-print('相関係数(降水量-NDSI)：','{:.3f}'.format(ns_corr))
-print('相関係数(降水量-GSI)：','{:.3f}'.format(gs_corr))
-
-print('相関係数(降水量3-NDVI)：','{:.3f}'.format(nd_corr3))
-print('相関係数(降水量3-NWVI)：','{:.3f}'.format(nw_corr3))
-print('相関係数(降水量3-NDSI)：','{:.3f}'.format(ns_corr3))
-print('相関係数(降水量3-GSI)：','{:.3f}'.format(gs_corr3))
-
-print('相関係数(降水量4-NDVI)：','{:.3f}'.format(nd_corr4))
-print('相関係数(降水量4-NWVI)：','{:.3f}'.format(nw_corr4))
-print('相関係数(降水量4-NDSI)：','{:.3f}'.format(ns_corr4))
-print('相関係数(降水量4-GSI)：','{:.3f}'.format(gs_corr4))
-
-print('相関係数(降水量5-NDVI)：','{:.3f}'.format(nd_corr5))
-print('相関係数(降水量5-NWVI)：','{:.3f}'.format(nw_corr5))
-print('相関係数(降水量5-NDSI)：','{:.3f}'.format(ns_corr5))
-print('相関係数(降水量5-GSI)：','{:.3f}'.format(gs_corr5))
-
-print('相関係数(降水量6-NDVI)：','{:.3f}'.format(nd_corr6))
-print('相関係数(降水量6-NWVI)：','{:.3f}'.format(nw_corr6))
-print('相関係数(降水量6-NDSI)：','{:.3f}'.format(ns_corr6))
-print('相関係数(降水量6-GSI)：','{:.3f}'.format(gs_corr6))
-
-print('相関係数(降水量7-NDVI)：','{:.3f}'.format(nd_corr7))
-print('相関係数(降水量7-NWVI)：','{:.3f}'.format(nw_corr7))
-print('相関係数(降水量7-NDSI)：','{:.3f}'.format(ns_corr7))
-print('相関係数(降水量7-GSI)：','{:.3f}'.format(gs_corr7))
-
-print('相関係数(降水量30-NDVI)：','{:.3f}'.format(nd_corr30))
-print('相関係数(降水量30-NWVI)：','{:.3f}'.format(nw_corr30))
-print('相関係数(降水量30-NDSI)：','{:.3f}'.format(ns_corr30))
-print('相関係数(降水量30-GSI)：','{:.3f}'.format(gs_corr30))
-
-
-#---NDVI、NWVI間等の相関係数を求めてみる
-# リストをps.Seriesに変換
-s21=pd.Series(ndvi_mean_list)
-s22=pd.Series(ndwi_mean_list)
-s23=pd.Series(ndsi_mean_list)
-s24=pd.Series(gsi_mean_list)
-
-# pandasを使用してPearson's rを計算
-res1=s21.corr(s22)   # numpy.float64 に格納される NDVI,NDWI
-res2=s21.corr(s23)   # numpy.float64 に格納される NDVI,NDSI
-res3=s21.corr(s24)   # numpy.float64 に格納される NDVI,GSI
-res4=s22.corr(s23)   # numpy.float64 に格納される NDWI,NDSI
-res5=s22.corr(s24)   # numpy.float64 に格納される NDWI,GSI
-res6=s23.corr(s24)   # numpy.float64 に格納される NDSI,GSI
-
-# 結果 nwvi
-print('相関係数(NDVI,NDWI)：','{:.3f}'.format(res1))
-print('相関係数(NDVI,NDSI)：','{:.3f}'.format(res2))
-print('相関係数(NDVI,GSI)：','{:.3f}'.format(res3))
-print('相関係数(NDWI,NDSI)：','{:.3f}'.format(res4))
-print('相関係数(NDWI,GSI)：','{:.3f}'.format(res5))
-print('相関係数(NDSI,GSI)：','{:.3f}'.format(res6))
-
 ##グラフを書く
 dfs = pd.DataFrame(df_clip2["日降水量"])
 sum = dfs.size
-
 print("リスト数",sum)
+
 
 #降水量をグラフに示す。
 fig1,ax1 = plt.subplots(figsize=(15,3))
@@ -474,10 +348,8 @@ ax1.set_xticks(np.arange(0,sum))  #X軸の数
 ax1.set_xticklabels(date1, fontsize=10, rotation = 25, ha="center")
 plt.tight_layout()
 #plt.show()
-precFile = outpath+filename+"_time_series_prec_img.jpg"
 if os.path.isfile(precFile):
         os.remove(precFile)   # Opt.: os.system("rm "+strFile)
-#plt.savefig(precFile, dpi=my_dpi)
 plt.savefig(precFile)
 plt.cla()
 
@@ -494,9 +366,7 @@ ax2.set_xticklabels(date1, fontsize=10,rotation = 25, ha="center")
 ax2.set_ylim(-1, 1) #y軸の最小と最大を決める
 plt.tight_layout() #レイアウトを最適化　ラベルが消えるのを制御する。
 #plt.show()
-indexFile = outpath+filename+"_time_series_index_img.jpg"
 if os.path.isfile(indexFile):
         os.remove(indexFile)   # Opt.: os.system("rm "+strFile)
-#plt.savefig(precFile, dpi=my_dpi)
 plt.savefig(indexFile)
 plt.cla()
