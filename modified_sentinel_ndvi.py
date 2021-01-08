@@ -304,6 +304,7 @@ if os.path.isfile(merge_file):
 #df_clip2.to_csv(merge_file, encoding="Shift_JIS", index=False, date_format='%Y%m%d')
 df_clip2.to_csv(merge_file, encoding="Shift_JIS", date_format='%Y%m%d')
 
+
 ## 相関係数をまとめて計算
 #'pearson': ピアソンの積率相関係数（デフォルト）
 #'kendall': ケンドールの順位相関係数
