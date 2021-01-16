@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[33]:
+
+
 # パッケージのインストール&インポート gdal
 #gdalによるNDVI等の計算と出力　https://qiita.com/t-mat/items/24073d8494a7427c0ee1
 #
@@ -18,10 +24,22 @@ from rasterio.plot import show
 from rasterio.mask import mask
 import glob
 import geopandas as gpd
+# matplotlibで時系列図を作成するときには以下をインポートします
+from pandas.plotting import register_matplotlib_converters
+# これを登録しておきます．
+register_matplotlib_converters()
+# sklearn(scikit-learn)は機械学習関連のライブラリーです．インポートします．
+from sklearn import linear_model
 import folium
 import matplotlib.cm as cm
+# datetimeは日時データを処理する際に便利なメソッドです．インポートします．
+from datetime import date, datetime, timedelta
 import datetime
 import csv
+# 有意検定をするためにscipyのstatsというメソッドをインポートします．
+import scipy.stats as stats
+#%precision 3
+#%matplotlib inline
 
 #area_name = 'hitoyoshi'
 area_name = 'nagahama'
@@ -37,7 +55,7 @@ shpath = input+'SHP/'
 outpath = output+'RESULT/'
 direct = input+'MET/'
 # inputデータ
-in_file = area_name+"_data.csv"   # 元の気象データ
+in_file = area_name+"_data1.csv"   # 元の気象データ
 input_shp = shpath + filename+'.shp' #　切り出し用のshpファイル
 data_path = input+'/DATA/' # オリジナルのセンチネルデータ
 # outputデータ
@@ -47,6 +65,7 @@ corr_file = outpath+filename+"_corr.csv"
 desc_file = outpath+filename+"_desc.csv"
 precFile = outpath+filename+"_time_series_prec_img.jpg"
 indexFile = outpath+filename+"_time_series_index_img.jpg"
+plotFile = outpath+filename+"_time_series_plot_img.jpg"
 
 #----------------------------フォルダが存在しない場合に作成する。
 def makepath(path):
@@ -107,6 +126,80 @@ def dataInfo(data_mean_list, data):
   data_mean_list = np.append(data_mean_list,data_mean)
   return data_mean_list, data_mean 
 
+#-----------------------アメダスデータの読み込み
+# 気象庁アメダスの気温の時系列データを読み込んで，
+# DataFrameに割り当てる関数
+        # ここがポイント！
+        # pandasのread_csvというメソッドでcsvファイルを読み込みます．
+        # 引数として，
+        # [0]入力ファイル名
+        # [1]エンコーディング
+        # [2]読み飛ばす行数，
+        # [3]column名
+        # [4]datetime型で読み込むcolumn名
+        # [5]indexとするcolumn名
+        # を与える
+def readamedas(filename,skipline):
+    amedas = pd.read_csv(
+        filename, 
+        encoding="Shift_JIS", 
+        skiprows=skipline, 
+        header=None, 
+        names=["date","Prec","dummy1","dummy2"],
+        parse_dates={'datetime':['date']}, 
+#        index_col='datetime'
+        )
+    return amedas
+#-----------------------散布図
+# ２つの時系列データから散布図を作成する関数
+def scatter(df,name1,name2,filename):
+    # ここがポイント！
+    # scikit-learnの線形回帰モデルのクラスを呼び出す
+    clf = linear_model.LinearRegression()
+    # 説明変数Xにはname1を割り当てる（numpy配列）
+    X=df.loc[:,[name1]].values
+    # 説明変数Yにはname2を割り当てる（numpy配列）
+    Y=df.loc[:,[name2]].values
+    # ここがポイント！
+    # Y=aX+bの予測モデルを作成する
+    clf.fit(X,Y)
+    # ここがポイント！
+    # 回帰係数a
+    slope=clf.coef_
+    # ここがポイント！
+    # 切片b
+    intercept=clf.intercept_
+    # ここがポイント！
+    # 決定係数R2（回帰直線の当てはまりの良さ）
+    r2=clf.score(X,Y)
+    # 文字列"Y=aX+b (R2=r2)"
+    equation="  y = "+str('{:.1f}'.format(slope[0][0]))+" x +"+str('{:.0f}'.format(intercept[0]))+" (R2="+str('{:.2f}'.format(r2))+")"
+    print(equation)
+    # 散布図の大きさを指定
+    plt.figure(figsize=(8, 8))
+    # 散布図のプロット
+    plt.plot(X, Y, 'o')
+    # ここがポイント！
+    # 散布図上に回帰直線を引く
+    plt.plot(X, clf.predict(X))
+    # 文字列"Y=aX+b (R2=r2)"を図の左上に置く
+    plt.text(np.nanmin(X), np.nanmax(Y), equation)
+    # グラフのタイトル
+    plt.title("Scatter diagram:"+name1+" and "+name2)
+    # x軸のラベル
+    plt.xlabel(name1)
+#    plt.xlim(-1, 1) #y軸の最小と最大を決める
+    # y軸のラベル
+    plt.ylabel(name2)
+#    if os.path.isfile(plotFile):
+#        os.remove(plotFile)   # Opt.: os.system("rm "+strFile)
+    plt.savefig(filename)
+#    plt.ylim(-1, 1) #y軸の最小と最大を決める
+    # 図を閉じる
+    plt.close()
+    return
+
+
 # ディレクトリが存在しない場合、ディレクトリを作成する 
 makepath(ndpath)
 makepath(nwpath)
@@ -148,9 +241,8 @@ print(mpl.matplotlib_fname())
 
 j=0
 num=1
-
 #-----------画像の切り出し
-for i in range(30):
+for i in range(10):
 #for i in range(len_num):
   input_raster = data_files[i]
   output_raster = data_files[i][:-4]+'_clip.tif'
@@ -243,109 +335,128 @@ interval6 =6
 interval7 =7
 interval30 =30
 
-#データ読み込み＋ヘッダ変更
-#lines = ["年月日,平均気温,平均品質,平均均質,最高気温,最高品質,最高均質,最低気温,最低品質,最低均質,日降水量,日降水量品質,日降水量均質,日照時間,日照品質,日照均質\n"] + lines[6:]  # Linesの5行を置き換え 長浜
-#lines = ["年月日,平均気温,平均品質,平均均質,最高気温,最高品質,最高均質,最低気温,最低品質,最低均質,日降水量,日降水量（現象）,日降水量品質,日降水量均質,日照時間,日照時間（現象）,日照品質,日照均質\n"] + lines[6:]  # Linesの5行を置き換え
-df = pd.read_csv(direct+in_file, encoding="Shift_JIS", header=None, names=("年月日","平均気温","平均品質","平均均質","最高気温","最高品質","最高均質","最低気温","最低品質","最低均質","日降水量","日降水量品質","日降水量均質","日照時間","日照品質","日照均質"))
-df = df.drop(df.index[[0, 1, 2, 3, 4]])
+#気象データ読み込み＋ヘッダ変更
+skipline1=5
+df = readamedas(direct+in_file,skipline1)
+# DataFrame(amedas)の中のdummy1とdummy2の列を削除する．
+df=df.drop(['dummy1','dummy2'],axis=1)
+#print(df)
 
-# 年月日を日付に変換、フォーマットもint型にする。
-df['年月日'] = pd.to_datetime(df['年月日'])
-df['年月日'] =  pd.Series(df['年月日'].dt.strftime('%Y%m%d'), dtype='str')
-df['日降水量'] =  pd.Series(df['日降水量'], dtype='float') #floatに変換 
-#print(df.dtypes)
-# 日降水量の移動合計を追加　（移動平均のような）
-df_sum3 = df["日降水量"].rolling(window=interval3).sum()
-df_sum4 = df["日降水量"].rolling(window=interval4).sum()
-df_sum5 = df["日降水量"].rolling(window=interval5).sum()
-df_sum6 = df["日降水量"].rolling(window=interval6).sum()
-df_sum7 = df["日降水量"].rolling(window=interval7).sum()
-df_sum30 = df["日降水量"].rolling(window=interval30).sum()
-## 移動合計データをdf リストに結合
-df['日降水量_3日積算'] = df_sum3
-df['日降水量_4日積算'] = df_sum4
-df['日降水量_5日積算'] = df_sum5
-df['日降水量_6日積算'] = df_sum6
-df['日降水量_7日積算'] = df_sum7
-df['日降水量_30日積算'] = df_sum30
-
-#--- NDVI等の計算結果をpandasでリスト化
-date = "年月日"
+# パラメータ設定
+date_time = "datetime"
+prec = "Prec"
+prec3 = "Prec_3days"
+prec4 = "Prec_4days"
+prec5 = "Prec_5days"
+prec6 = "Prec_6days"
+prec7 = "Prec_7days"
+prec30 = "Prec_30days"
 name_NDVI = "NDVI"
 name_NDWI = "NDWI"
 name_NDSI = "NDSI"
 name_GSI = "GSI"
 
-ct_csv = np.array([data_title_list, ndvi_mean_list, ndwi_mean_list, ndsi_mean_list, gsi_mean_list]).T #行列を転置
-vi_data = pd.DataFrame(ct_csv,columns =[ "年月日",name_NDVI ,name_NDWI, name_NDSI,name_GSI]) #タイトル行を追加 
 
+# 年月日を日付に変換、フォーマットもint型にする。
+#df['年月日'] = pd.to_datetime(df['年月日'])
+#df['年月日'] =  pd.Series(df['年月日'].dt.strftime('%Y%m%d'), dtype='str')
+df[prec] =  pd.Series(df[prec], dtype='float') #floatに変換 
+# 日降水量の移動合計を追加　（移動平均のような）
+df_sum3 = df[prec].rolling(window=interval3).sum()
+df_sum4 = df[prec].rolling(window=interval4).sum()
+df_sum5 = df[prec].rolling(window=interval5).sum()
+df_sum6 = df[prec].rolling(window=interval6).sum()
+df_sum7 = df[prec].rolling(window=interval7).sum()
+df_sum30 = df[prec].rolling(window=interval30).sum()
+## 移動合計データをdf リストに結合
+df[prec3] = df_sum3
+df[prec4] = df_sum4
+df[prec5] = df_sum5
+df[prec6] = df_sum6
+df[prec7] = df_sum7
+df[prec30] = df_sum30
+
+#--- NDVI等の計算結果をpandasでリスト化
+ct_csv = np.array([data_title_list, ndvi_mean_list, ndwi_mean_list, ndsi_mean_list, gsi_mean_list]).T #行列を転置
+vi_data = pd.DataFrame(ct_csv,columns =[date_time, name_NDVI ,name_NDWI, name_NDSI,name_GSI]) #タイトル行を追加 
+
+# 年月日を日付に変換、フォーマットもint型にする。
+vi_data[date_time] = pd.to_datetime(vi_data[date_time])
+# ndvi等のフォーマットもfloat型にする。
 vi_data[name_NDVI] =  pd.Series(vi_data[name_NDVI], dtype='float') #floatに変換 
 vi_data[name_NDWI] =  pd.Series(vi_data[name_NDWI], dtype='float') #floatに変換
 vi_data[name_NDSI] =  pd.Series(vi_data[name_NDSI], dtype='float') #floatに変換
 vi_data[name_GSI] =  pd.Series(vi_data[name_GSI], dtype='float') #floatに変換
 
-
 #　同じ日付を抽出　https://reffect.co.jp/python/python-pandas-not-duplicate-in-two-excels
-df_merge = pd.merge(vi_data,df,on="年月日",how="outer",indicator=True)
-df_clip = df_merge[df_merge["_merge"] == 'both']
-df_clip2 = df_clip.dropna() #NaN（欠損値）が一つでもある行は削除する。（https://note.nkmk.me/python-pandas-nan-dropna-fillna/）
-#print("df_clip2:",df_clip2)
+#df_merge = pd.merge(vi_data,df,on=date_time,how="outer",indicator=True)
+df_merge = pd.merge(vi_data,df,on=date_time,how="inner",indicator=True) # how=outerはNANが残る。
+'''
+left_index=Trueと設定すると，左側のデータフレームのインデックスを結合のキーとして用います．right_index=Trueと設定すると，右側のデータフレームのインデックスを結合のキーとして用います．
+'''
+#df_clip = df_merge[df_merge["_merge"] == 'both'] #　dfとvi_dataの両方が存在する行（日時）のみ残す。
+df_clip = df_merge.dropna() #NaN（欠損値）が一つでもある行は削除する。（https://note.nkmk.me/python-pandas-nan-dropna-fillna/）
+df_clip[date_time] =  pd.Series(df_clip[date_time].dt.strftime('%Y%m%d'), dtype='str') # 日時のフォーマットを変更
 
-#'統計量を算出する
-df_clip2_desc = df_clip2.describe()
-print(df_clip2.describe())
+# 処理されたデータを用いて散布図を作成し、図として保存する．
+scatter(df_clip,name_NDWI,name_NDVI,plotFile)
+
+
+#'統計量を算出してcsvで保存する。
+df_clip_desc = df_clip.describe()
+print(df_clip.describe())
 if os.path.isfile(desc_file):
         os.remove(desc_file)   # Opt.: os.system("rm "+strFile)
-df_clip2_desc.to_csv(desc_file, encoding="Shift_JIS",  date_format='%Y%m%d')
+df_clip_desc.to_csv(desc_file, encoding="Shift_JIS",  date_format='%Y%m%d')
 
 # mergeしたデータをcsvで保存する。
 if os.path.isfile(merge_file):
         os.remove(merge_file)   # Opt.: os.system("rm "+strFile)
-#df_clip2.to_csv(merge_file, encoding="Shift_JIS", index=False, date_format='%Y%m%d')
-df_clip2.to_csv(merge_file, encoding="Shift_JIS", date_format='%Y%m%d')
+df_clip.to_csv(merge_file, encoding="Shift_JIS", date_format='%Y%m%d')
 
 
-## 相関係数をまとめて計算
+## 相関係数をまとめて計算してcsvで保存する。
 #'pearson': ピアソンの積率相関係数（デフォルト）
 #'kendall': ケンドールの順位相関係数
 #'spearman': スピアマンの順位相関係数
 # 表の並べ替え　https://qiita.com/Masahiro_T/items/2f9574c80193f58af7fe
-df_clip2_corr = df_clip2.corr(method='pearson')
-print(df_clip2.corr())
+df_clip_corr = df_clip.corr(method='pearson')
+print(df_clip.corr())
 if os.path.isfile(corr_file):
         os.remove(corr_file)   # Opt.: os.system("rm "+strFile)
-df_clip2_corr.to_csv(corr_file, encoding="Shift_JIS",  date_format='%Y%m%d')
+df_clip_corr.to_csv(corr_file, encoding="Shift_JIS",  date_format='%Y%m%d')
 
 
-date1 =  np.array(df_clip2["年月日"])
-ndvi1 = np.array(df_clip2["NDVI"])
-ndwi1 = np.array(df_clip2["NDWI"])
-ndsi1 = np.array(df_clip2["NDSI"])
-gsi1 = np.array(df_clip2["GSI"])
-prec = np.array(df_clip2["日降水量"])
-prec3 = np.array(df_clip2["日降水量_3日積算"])
-prec4 = np.array(df_clip2["日降水量_4日積算"])
-prec5 = np.array(df_clip2["日降水量_5日積算"])
-prec6 = np.array(df_clip2["日降水量_6日積算"])
-prec7 = np.array(df_clip2["日降水量_7日積算"])
-prec30 = np.array(df_clip2["日降水量_30日積算"])
+date1 =  np.array(df_clip[date_time])
+ndvi1 = np.array(df_clip[name_NDVI])
+ndwi1 = np.array(df_clip[name_NDWI])
+ndsi1 = np.array(df_clip[name_NDSI])
+gsi1 = np.array(df_clip[name_GSI])
+np_prec = np.array(df_clip[prec])
+np_prec3 = np.array(df_clip[prec3])
+np_prec4 = np.array(df_clip[prec4])
+np_prec5 = np.array(df_clip[prec5])
+np_prec6 = np.array(df_clip[prec6])
+np_prec7 = np.array(df_clip[prec7])
+np_prec30 = np.array(df_clip[prec30])
 
 ##グラフを書く
-dfs = pd.DataFrame(df_clip2["日降水量"])
+dfs = pd.DataFrame(df_clip[prec])
 sum = dfs.size
 print("リスト数",sum)
 
 
 #降水量をグラフに示す。
 fig1,ax1 = plt.subplots(figsize=(15,3))
-plt.plot(prec, marker='o', label='PREC')
-plt.plot(prec3, marker='*', label='PREC3')
-plt.plot(prec4, marker='+', label='PREC4')
-plt.plot(prec5, marker='.', label='PREC5')
-plt.plot(prec6, marker='1', label='PREC6')
-plt.plot(prec7, marker='2', label='PREC7')
-plt.plot(prec30, marker='3', label='PREC30')
-plt.legend()
+plt.plot(np_prec, marker='o', label='PREC')
+plt.plot(np_prec3, marker='*', label='PREC3')
+plt.plot(np_prec4, marker='+', label='PREC4')
+plt.plot(np_prec5, marker='.', label='PREC5')
+plt.plot(np_prec6, marker='1', label='PREC6')
+plt.plot(np_prec7, marker='2', label='PREC7')
+plt.plot(np_prec30, marker='3', label='PREC30')
+plt.legend(bbox_to_anchor=(1, 1), loc='upper right', borderaxespad=0, fontsize=10)
+#plt.legend()
 ax1.set_xticks(np.arange(0,sum))  #X軸の数
 ax1.set_xticklabels(date1, fontsize=10, rotation = 25, ha="center")
 plt.tight_layout()
@@ -358,11 +469,12 @@ plt.cla()
 #NDVIの時系列変化をグラフに示す
 fig2,ax2 = plt.subplots(figsize=(15,3))
 #plt.plot(prep, marker='o', label='PREP')
-plt.plot(ndvi1, marker='*', label='NDVI')
-plt.plot(ndwi1, marker='+', label='NDWI')
-plt.plot(ndsi1, marker='.', label='NDSI')
-plt.plot(gsi1, marker='1', label='GSI')
-plt.legend()
+plt.plot(ndvi1, marker='*', label=name_NDVI)
+plt.plot(ndwi1, marker='+', label=name_NDWI)
+plt.plot(ndsi1, marker='.', label=name_NDSI)
+plt.plot(gsi1, marker='1', label=name_GSI)
+plt.legend(bbox_to_anchor=(1, 1), loc='upper right', borderaxespad=0, fontsize=10)
+#plt.legend()
 ax2.set_xticks(np.arange(0,sum))  #X軸の数
 ax2.set_xticklabels(date1, fontsize=10,rotation = 25, ha="center")
 ax2.set_ylim(-1, 1) #y軸の最小と最大を決める
@@ -372,3 +484,40 @@ if os.path.isfile(indexFile):
         os.remove(indexFile)   # Opt.: os.system("rm "+strFile)
 plt.savefig(indexFile)
 plt.cla()
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
