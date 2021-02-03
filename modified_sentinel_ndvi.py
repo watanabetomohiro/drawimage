@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-# In[33]:
-
-
 # パッケージのインストール&インポート gdal
 #gdalによるNDVI等の計算と出力　https://qiita.com/t-mat/items/24073d8494a7427c0ee1
 #
@@ -34,7 +30,7 @@ import folium
 import matplotlib.cm as cm
 # datetimeは日時データを処理する際に便利なメソッドです．インポートします．
 from datetime import date, datetime, timedelta
-import datetime
+#import datetime
 import csv
 # 有意検定をするためにscipyのstatsというメソッドをインポートします．
 import scipy.stats as stats
@@ -42,7 +38,7 @@ import scipy.stats as stats
 #%matplotlib inline
 
 #area_name = 'hitoyoshi'
-area_name = 'nagahama'
+area_name = 'nagahama1'
 direct_name = '/home/twatanabe/senti/'
 filename = "kohoku_AOI1_clip_paddy" #  長浜
 input =  direct_name+area_name+'/INPUT/'
@@ -64,6 +60,7 @@ merge_file = outpath+filename+"_merge.csv"
 corr_file = outpath+filename+"_corr.csv"
 desc_file = outpath+filename+"_desc.csv"
 precFile = outpath+filename+"_time_series_prec_img.jpg"
+precviFile = outpath+filename+"_time_series_prec_vi_img.jpg"
 indexFile = outpath+filename+"_time_series_index_img.jpg"
 plotFile = outpath+filename+"_time_series_plot_img.jpg"
 
@@ -144,12 +141,51 @@ def readamedas(filename,skipline):
         filename, 
         encoding="Shift_JIS", 
         skiprows=skipline, 
-        header=None, 
-        names=["date","Prec","dummy1","dummy2"],
-        parse_dates={'datetime':['date']}, 
-#        index_col='datetime'
+#        header=None, 
+        names=["Date","Prec","dummy1","dummy2"],
+        index_col='Date',
+#        parse_dates={'datetime':['date']}, 
+        parse_dates=True, 
         )
     return amedas
+#def 5.############################################
+# ２つの時系列データから時系列図を作成する関数
+def timeseries(df,date1,name1,name2,filename):
+    # dfのインデックス（時間）をXとする
+#    X=df.index
+    X=df.loc[:,[date1]].values
+    print(df.loc[:,[date1]].values)
+    # dfのname1列を指定してデータを取り出し，numpy配列で値をY1に与える．
+    Y1=df.loc[:,[name1]].values
+    # dfのname1列を指定してデータを取り出し，numpy配列で値をY2に与える．
+    Y2=df.loc[:,[name2]].values
+    # 時系列図の大きさを指定
+    plt.figure(figsize=(20, 10))
+    # 1つ目(name1)のグラフを1行1列の1つ目に
+    ax1=plt.subplot(1,1,1)
+    # 2つ目(name2)のグラフのx軸を共有する
+    ax2=ax1.twinx()
+    # 1つ目(name1)の時系列 
+    ax1.plot(X,Y1,color='blue',label=name1)
+    # 2つ目(name2)の時系列 
+    ax2.plot(X,Y2,color='red',label=name2)
+    # グラフのタイトル
+    ax1.set_title("Timeseries:"+name1+" and "+name2)
+    # x軸のラベル
+    ax1.set_xlabel('Time')
+    # y軸（左側の第1軸）のラベル
+    ax1.set_ylabel('Index')
+    # y軸（右側の第2軸）のラベル
+    ax2.set_ylabel('Amount of Precipitation [mm/hr]')
+    # 1つ目(name1)の凡例（左上に置く） 
+    ax1.legend(loc='upper left')
+    # 2つ目(name1)の凡例（右上に置く）
+    ax2.legend(loc='upper right')
+    # 保存するファイル名
+    plt.savefig(filename)
+    # 図を閉じる
+    plt.close()
+    return
 #-----------------------散布図
 # ２つの時系列データから散布図を作成する関数
 def scatter(df,name1,name2,filename):
@@ -175,6 +211,8 @@ def scatter(df,name1,name2,filename):
     # 文字列"Y=aX+b (R2=r2)"
     equation="  y = "+str('{:.1f}'.format(slope[0][0]))+" x +"+str('{:.0f}'.format(intercept[0]))+" (R2="+str('{:.2f}'.format(r2))+")"
     print(equation)
+    # 相関係数とその有意確率p-値を計算
+    corrcoef, pvalue = stats.pearsonr(np.ravel(X),np.ravel(Y))
     # 散布図の大きさを指定
     plt.figure(figsize=(8, 8))
     # 散布図のプロット
@@ -197,8 +235,7 @@ def scatter(df,name1,name2,filename):
 #    plt.ylim(-1, 1) #y軸の最小と最大を決める
     # 図を閉じる
     plt.close()
-    return
-
+    return corrcoef, pvalue
 
 # ディレクトリが存在しない場合、ディレクトリを作成する 
 makepath(ndpath)
@@ -242,13 +279,13 @@ print(mpl.matplotlib_fname())
 j=0
 num=1
 #-----------画像の切り出し
-for i in range(10):
-#for i in range(len_num):
+#for i in range(10):
+for i in range(len_num):
   input_raster = data_files[i]
   output_raster = data_files[i][:-4]+'_clip.tif'
   print(input_raster)
   print(output_raster)
-  gdal.Warp(output_raster, input_raster, format = 'GTiff', cutlineDSName = input_shp, dstNodata = np.nan)
+ # gdal.Warp(output_raster, input_raster, format = 'GTiff', cutlineDSName = input_shp, dstNodata = np.nan)
 
 
 #----read red datra--------
@@ -340,10 +377,10 @@ skipline1=5
 df = readamedas(direct+in_file,skipline1)
 # DataFrame(amedas)の中のdummy1とdummy2の列を削除する．
 df=df.drop(['dummy1','dummy2'],axis=1)
-#print(df)
+print("df",df)
 
 # パラメータ設定
-date_time = "datetime"
+date_time = "Date"
 prec = "Prec"
 prec3 = "Prec_3days"
 prec4 = "Prec_4days"
@@ -355,7 +392,6 @@ name_NDVI = "NDVI"
 name_NDWI = "NDWI"
 name_NDSI = "NDSI"
 name_GSI = "GSI"
-
 
 # 年月日を日付に変換、フォーマットもint型にする。
 #df['年月日'] = pd.to_datetime(df['年月日'])
@@ -379,9 +415,10 @@ df[prec30] = df_sum30
 #--- NDVI等の計算結果をpandasでリスト化
 ct_csv = np.array([data_title_list, ndvi_mean_list, ndwi_mean_list, ndsi_mean_list, gsi_mean_list]).T #行列を転置
 vi_data = pd.DataFrame(ct_csv,columns =[date_time, name_NDVI ,name_NDWI, name_NDSI,name_GSI]) #タイトル行を追加 
-
+#print("vidata",vi_data)
 # 年月日を日付に変換、フォーマットもint型にする。
 vi_data[date_time] = pd.to_datetime(vi_data[date_time])
+#vi_data = vi_data.set_index([date_time]) # index keyの設定
 # ndvi等のフォーマットもfloat型にする。
 vi_data[name_NDVI] =  pd.Series(vi_data[name_NDVI], dtype='float') #floatに変換 
 vi_data[name_NDWI] =  pd.Series(vi_data[name_NDWI], dtype='float') #floatに変換
@@ -389,22 +426,29 @@ vi_data[name_NDSI] =  pd.Series(vi_data[name_NDSI], dtype='float') #floatに変�
 vi_data[name_GSI] =  pd.Series(vi_data[name_GSI], dtype='float') #floatに変換
 
 #　同じ日付を抽出　https://reffect.co.jp/python/python-pandas-not-duplicate-in-two-excels
-#df_merge = pd.merge(vi_data,df,on=date_time,how="outer",indicator=True)
-df_merge = pd.merge(vi_data,df,on=date_time,how="inner",indicator=True) # how=outerはNANが残る。
+df_merge = pd.merge(df,vi_data,on=date_time,how="inner",indicator=True) # how=outerはNANが残る。
+#df_merge = pd.merge(df, vi_data, how="inner",left_index=True, right_index=True) # how=outerはNANが残る。
 '''
 left_index=Trueと設定すると，左側のデータフレームのインデックスを結合のキーとして用います．right_index=Trueと設定すると，右側のデータフレームのインデックスを結合のキーとして用います．
 '''
-#df_clip = df_merge[df_merge["_merge"] == 'both'] #　dfとvi_dataの両方が存在する行（日時）のみ残す。
-df_clip = df_merge.dropna() #NaN（欠損値）が一つでもある行は削除する。（https://note.nkmk.me/python-pandas-nan-dropna-fillna/）
-df_clip[date_time] =  pd.Series(df_clip[date_time].dt.strftime('%Y%m%d'), dtype='str') # 日時のフォーマットを変更
+df_clip = df_merge.dropna(how='any') #NaN（欠損値）が一つでもある行は削除する。（https://note.nkmk.me/python-pandas-nan-dropna-fillna/）
+df_clip[date_time] =  pd.Series(df_clip[date_time].dt.strftime('%Y%m%d'), dtype='int') # 日時のフォーマットを変更
+#df_clip[date_time] =  pd.Series(df_clip[date_time].dt.strftime('%Y%m%d'), dtype='str') # 日時のフォーマットを変更
+#df_clip = df_clip.set_index([date_time]) # index keyの設定
+print(df_clip)
 
 # 処理されたデータを用いて散布図を作成し、図として保存する．
-scatter(df_clip,name_NDWI,name_NDVI,plotFile)
+#corrcoef, pvalue = scatter(df_clip,name_NDWI,name_NDVI,plotFile)
+corrcoef, pvalue = scatter(df_clip,name_NDVI,prec5,plotFile)
+print("Peoc_NDVI... Corr=",corrcoef,"(p-value=",pvalue,")")
+# 処理されたデータを用いて時系列図を作成します．
+# ファイル名：precviFile # 
+timeseries(df_clip,date_time,name_NDVI,prec5,precviFile)
 
 
 #'統計量を算出してcsvで保存する。
 df_clip_desc = df_clip.describe()
-print(df_clip.describe())
+#print(df_clip.describe())
 if os.path.isfile(desc_file):
         os.remove(desc_file)   # Opt.: os.system("rm "+strFile)
 df_clip_desc.to_csv(desc_file, encoding="Shift_JIS",  date_format='%Y%m%d')
@@ -421,7 +465,7 @@ df_clip.to_csv(merge_file, encoding="Shift_JIS", date_format='%Y%m%d')
 #'spearman': スピアマンの順位相関係数
 # 表の並べ替え　https://qiita.com/Masahiro_T/items/2f9574c80193f58af7fe
 df_clip_corr = df_clip.corr(method='pearson')
-print(df_clip.corr())
+#print(df_clip.corr())
 if os.path.isfile(corr_file):
         os.remove(corr_file)   # Opt.: os.system("rm "+strFile)
 df_clip_corr.to_csv(corr_file, encoding="Shift_JIS",  date_format='%Y%m%d')
@@ -460,6 +504,7 @@ plt.legend(bbox_to_anchor=(1, 1), loc='upper right', borderaxespad=0, fontsize=1
 ax1.set_xticks(np.arange(0,sum))  #X軸の数
 ax1.set_xticklabels(date1, fontsize=10, rotation = 25, ha="center")
 plt.tight_layout()
+plt.grid(True)
 #plt.show()
 if os.path.isfile(precFile):
         os.remove(precFile)   # Opt.: os.system("rm "+strFile)
@@ -479,45 +524,9 @@ ax2.set_xticks(np.arange(0,sum))  #X軸の数
 ax2.set_xticklabels(date1, fontsize=10,rotation = 25, ha="center")
 ax2.set_ylim(-1, 1) #y軸の最小と最大を決める
 plt.tight_layout() #レイアウトを最適化　ラベルが消えるのを制御する。
+plt.grid(True)
 #plt.show()
 if os.path.isfile(indexFile):
         os.remove(indexFile)   # Opt.: os.system("rm "+strFile)
 plt.savefig(indexFile)
 plt.cla()
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
-
-
-
-
